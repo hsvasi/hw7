@@ -1,6 +1,26 @@
-window.addEventListener('DOMContentLoaded', async function(event) {
+firebase.auth().onAuthStateChanged(async function(user) {
+  
+
+  if(user){
   let db = firebase.firestore()
-  let apiKey = 'your TMDB API key'
+  console.log(user)
+
+  db.collection('users').doc(user.uid).set({
+    name: user.displayName,
+    email: user.email
+  })
+
+  document.querySelector('.sign-in-or-sign-out').innerHTML = `<p class="text-black-500 bold">${user.displayName} is logged in</p>
+  <a href="#" class="sign-out text-pink-500 underline">Sign Out</a>`
+
+  document.querySelector('.sign-out').addEventListener('click', function(event){
+    event.preventDefault()
+    firebase.auth().signOut()
+    document.location.href = 'movies.html'
+  })
+
+
+  let apiKey = `a6b202b40dbf2dde0a60f81fbfcb68f7`
   let response = await fetch(`https://api.themoviedb.org/3/movie/now_playing?api_key=${apiKey}&language=en-US`)
   let json = await response.json()
   let movies = json.results
@@ -8,10 +28,10 @@ window.addEventListener('DOMContentLoaded', async function(event) {
   
   for (let i=0; i<movies.length; i++) {
     let movie = movies[i]
-    let docRef = await db.collection('watched').doc(`${movie.id}`).get()
-    let watchedMovie = docRef.data()
+    let docRef = await db.collection('user_watched').where('userId', '==', user.uid).where('movieId', '==', movie.id).get()
+    let watchedMovie = docRef.docs
     let opacityClass = ''
-    if (watchedMovie) {
+    if (watchedMovie.length>0) {
       opacityClass = 'opacity-20'
     }
 
@@ -26,9 +46,30 @@ window.addEventListener('DOMContentLoaded', async function(event) {
       event.preventDefault()
       let movieElement = document.querySelector(`.movie-${movie.id}`)
       movieElement.classList.add('opacity-20')
-      await db.collection('watched').doc(`${movie.id}`).set({})
+      
+        await db.collection('user_watched').add({          
+        movieId: movie.id,
+        userId: user.uid})
+      
     }) 
   }
+}
+else{
+    console.log('no user')
+   // document.querySelector('form').classList.add('hidden')
+ 
+   let ui = new firebaseui.auth.AuthUI(firebase.auth())
+
+    let authUIConfig = {
+      signInOptions: [
+        firebase.auth.EmailAuthProvider.PROVIDER_ID
+      ],
+      signInSuccessUrl: 'movies.html'
+    }
+ 
+    // Starts FirebaseUI Auth
+    ui.start('.sign-in-or-sign-out', authUIConfig)
+}
 })
 
 // Goal:   Refactor the movies application from last week, so that it supports
